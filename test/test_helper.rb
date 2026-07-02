@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
-$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
-require "resque/mcp"
+ENV["RAILS_ENV"] = "test"
 
-require "minitest/autorun"
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require_relative "dummy/config/environment"
+
+require "rails/test_help"
+
+Dir[File.expand_path("support/**/*.rb", __dir__)].sort.each { |f| require f }

@@ -1,4 +1,6 @@
 /.bundle/
+/docs/
+/CLAUDE.md
 /.yardoc
 /_yardoc/
 /coverage/
