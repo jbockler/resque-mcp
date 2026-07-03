@@ -35,6 +35,58 @@ module Resque
         assert_equal({}, stats[:queue_sizes])
       end
 
+      def test_queues_returns_name_to_size_hash
+        seed_jobs("imports", "ImportWorker", count: 3)
+        seed_jobs("default", "SomeJob")
+
+        assert_equal({"imports" => 3, "default" => 1}, @adapter.queues)
+      end
+
+      def test_queue_size
+        seed_jobs("imports", "ImportWorker", count: 2)
+
+        assert_equal 2, @adapter.queue_size("imports")
+      end
+
+      def test_queue_size_unknown_queue_raises_with_known_names
+        seed_jobs("imports", "ImportWorker")
+
+        error = assert_raises(Adapter::UnknownQueueError) { @adapter.queue_size("nope") }
+        assert_includes error.message, '"nope"'
+        assert_includes error.message, "imports"
+      end
+
+      def test_peek_pages_through_pending_jobs
+        3.times { |i| seed_jobs("imports", "ImportWorker", args: [i]) }
+
+        result = @adapter.peek("imports", offset: 1, limit: 2)
+
+        assert_equal 3, result[:size]
+        assert_equal [[1], [2]], result[:jobs].map { |j| j["args"] }
+      end
+
+      # Pin the resque quirk: peek with count == 1 returns a bare hash.
+      def test_peek_normalizes_single_job_bare_hash
+        seed_jobs("imports", "ImportWorker", args: [812])
+
+        result = @adapter.peek("imports", offset: 0, limit: 1)
+
+        assert_equal [{"class" => "ImportWorker", "args" => [812]}], result[:jobs]
+      end
+
+      def test_peek_beyond_end_returns_empty_jobs
+        seed_jobs("imports", "ImportWorker")
+
+        result = @adapter.peek("imports", offset: 5, limit: 1)
+
+        assert_equal [], result[:jobs]
+        assert_equal 1, result[:size]
+      end
+
+      def test_peek_unknown_queue_raises
+        assert_raises(Adapter::UnknownQueueError) { @adapter.peek("nope", offset: 0, limit: 20) }
+      end
+
       # mock_redis reports a junk identifier, so stripping is tested against
       # a stub that only answers redis_id.
       def test_redis_identifier_strips_userinfo_from_url

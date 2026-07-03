@@ -22,7 +22,25 @@ module Resque
 
         assert_response :ok
         tools = response.parsed_body.dig("result", "tools")
-        assert_equal ["overview"], tools.map { |t| t["name"] }
+        assert_equal ["overview", "queue_stats"], tools.map { |t| t["name"] }.sort
+      end
+
+      def test_queue_stats_tool_call_round_trips
+        reset_resque!
+        seed_jobs("imports", "ImportWorker", count: 2, args: [812])
+
+        post_jsonrpc(method: "tools/call", params: {
+          name: "queue_stats",
+          arguments: {queue: "imports", include_jobs: true, limit: 1}
+        })
+
+        assert_response :ok
+        result = response.parsed_body.fetch("result")
+        refute result["isError"]
+        content = result.fetch("structuredContent")
+        assert_equal 2, content["size"]
+        assert_equal [{"class" => "ImportWorker", "args_preview" => "[812]"}], content["jobs"]
+        assert_equal 1, content.dig("page", "next_offset")
       end
 
       def test_overview_tool_call_round_trips

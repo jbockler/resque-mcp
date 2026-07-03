@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- `queue_stats` tool: list all queues with sizes, or inspect one queue and page through its pending job payloads (`include_jobs: true`); paginated responses carry a `page` envelope (`total`/`offset`/`limit`/`returned`/`has_more`/`next_offset`), limits above 100 are clamped with an in-band note, and job args are shown as truncated previews.
+
 ## [0.1.0]
 
 - Mountable Rails engine serving a stateless MCP Streamable HTTP endpoint (`POST` only; all other verbs answer 405).
