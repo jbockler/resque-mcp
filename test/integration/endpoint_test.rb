@@ -85,6 +85,32 @@ module Resque
         assert_equal "test", content.dig("meta", "environment")
       end
 
+      def test_args_are_filtered_via_rails_filter_parameters_by_default
+        reset_resque!
+        seed_failure(args: [{"password" => "hunter2", "batch" => 7}])
+
+        post_jsonrpc(method: "tools/call", params: {name: "get_failure", arguments: {index: 0}})
+
+        assert_response :ok
+        refute_includes response.body, "hunter2"
+        args = response.parsed_body.dig("result", "structuredContent", "args")
+        assert_equal "[FILTERED]", args.first["password"]
+        assert_equal 7, args.first["batch"]
+      end
+
+      def test_explicit_gem_config_replaces_the_rails_filter_list
+        reset_resque!
+        seed_failure(args: [{"password" => "hunter2"}])
+
+        with_filter_parameters([]) do
+          post_jsonrpc(method: "tools/call", params: {name: "get_failure", arguments: {index: 0}})
+        end
+
+        args = response.parsed_body.dig("result", "structuredContent", "args")
+        assert_equal "hunter2", args.first["password"],
+          "explicit filter_parameters must replace, not merge with, the Rails list"
+      end
+
       def test_non_post_verbs_are_method_not_allowed
         %i[get delete put patch options].each do |verb|
           public_send(verb, McpRequestHelpers::ENDPOINT)

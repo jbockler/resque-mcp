@@ -75,12 +75,55 @@ module Resque
         Resque::Failure.backend = Resque::Failure::Redis
       end
 
+      # Hash args are filtered as their own roots — anchored dot-notation
+      # filters must match exactly as in Rails log filtering.
+      def test_anchored_dot_notation_filters_match_hash_args
+        seed_failure(args: [{"credit_card" => {"code" => "123", "brand" => "visa"}}])
+
+        response = with_filter_parameters([/\Acredit_card\.code\z/]) do
+          Tools::GetFailure.call(index: 0, server_context: server_context)
+        end
+
+        card = response.structured_content[:args].first["credit_card"]
+        assert_equal "[FILTERED]", card["code"]
+        assert_equal "visa", card["brand"]
+      end
+
+      # A host proc assuming string values (common in Rails apps) raises on
+      # numeric job args — args must be withheld, never leaked, and the
+      # tool must not crash into an opaque JSON-RPC error.
+      def test_raising_host_filter_fails_closed_with_in_band_mark
+        seed_failure(args: [{"count" => 42}])
+        string_only_proc = ->(_k, v) { v.gsub!(/\d/, "*") if v.match?(/\d/) }
+
+        response = with_filter_parameters([string_only_proc]) do
+          Tools::GetFailure.call(index: 0, server_context: server_context)
+        end
+
+        refute response.error?
+        assert_equal "[args withheld: filter_parameters raised NoMethodError]",
+          response.structured_content[:args]
+      end
+
       def test_tolerates_unexpected_arguments
         seed_failure
 
         response = Tools::GetFailure.call(index: 0, verbose: true, server_context: server_context)
 
         refute response.error?
+      end
+
+      def test_filters_configured_parameters_out_of_args
+        seed_failure(args: [{"password" => "hunter2", "user" => {"api_token" => "t-123", "name" => "jo"}}])
+
+        response = with_filter_parameters([:password, :token]) do
+          Tools::GetFailure.call(index: 0, server_context: server_context)
+        end
+
+        args = response.structured_content[:args]
+        assert_equal "[FILTERED]", args.first["password"]
+        assert_equal "[FILTERED]", args.first.dig("user", "api_token"), "filters must match nested keys partially"
+        assert_equal "jo", args.first.dig("user", "name")
       end
 
       private
