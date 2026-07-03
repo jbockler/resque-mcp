@@ -27,6 +27,7 @@ mount Resque::Mcp::Engine => "/resque-mcp"
 
 # config/initializers/resque_mcp.rb
 Resque::Mcp.configure do |c|
+  # token could be created by e.g.: `bin/rails runner 'puts SecureRandom.base58(32)'`
   c.auth_token = Rails.application.credentials.dig(:resque_mcp, :token)
 end
 ```

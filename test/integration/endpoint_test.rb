@@ -22,7 +22,34 @@ module Resque
 
         assert_response :ok
         tools = response.parsed_body.dig("result", "tools")
-        assert_equal ["overview", "queue_stats"], tools.map { |t| t["name"] }.sort
+        assert_equal ["get_failure", "list_failures", "overview", "queue_stats"],
+          tools.map { |t| t["name"] }.sort
+      end
+
+      def test_failure_tools_round_trip
+        reset_resque!
+        seed_failure(queue: "imports", klass: "ImportWorker", args: [812], message: "boom")
+
+        post_jsonrpc(method: "tools/call", params: {
+          name: "list_failures", arguments: {}
+        })
+        assert_response :ok
+        result = response.parsed_body.fetch("result")
+        refute result["isError"]
+        failure = result.dig("structuredContent", "failures").first
+        assert_equal 0, failure["index"]
+        assert_equal "ImportWorker", failure["class"]
+        refute failure.key?("backtrace")
+
+        post_jsonrpc(method: "tools/call", params: {
+          name: "get_failure", arguments: {index: 0}
+        }, id: 2)
+        assert_response :ok
+        result = response.parsed_body.fetch("result")
+        refute result["isError"]
+        content = result.fetch("structuredContent")
+        assert_equal [812], content["args"]
+        assert_kind_of Array, content["backtrace"]
       end
 
       def test_queue_stats_tool_call_round_trips

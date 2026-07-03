@@ -9,7 +9,7 @@ module Resque
         ::MCP::Server.new(
           name: "resque-mcp",
           version: Resque::Mcp::VERSION,
-          tools: [Tools::Overview, Tools::QueueStats],
+          tools: [Tools::Overview, Tools::QueueStats, Tools::ListFailures, Tools::GetFailure],
           server_context: {adapter: Adapter.new, environment: environment}
         )
       end
