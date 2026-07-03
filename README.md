@@ -45,7 +45,7 @@ Then ask, e.g., "How is my Resque doing?"
 
 ## Tools
 
-The tool surface is currently in progress. Every tool response returns structured JSON alongside a text body and ends in a `meta` footer naming the Rails environment and the Redis target (with any credentials stripped), so you always see what you are talking to.
+The tool surface is read-only so far (worker inspection and failure retry/clear are planned). Every tool response returns structured JSON alongside a text body and ends in a `meta` footer naming the Rails environment and the Redis target (with any credentials stripped), so you always see what you are talking to.
 
 ### `overview` — read-only
 
@@ -64,9 +64,63 @@ Global Resque health snapshot; takes no parameters.
 - `processed` is Resque's lifetime counter; `failed` is the current number of records in the failed list.
 - `workers` counts registered workers, `working` those currently running a job.
 
+### `queue_stats` — read-only
+
+List all queues with sizes, or inspect a single queue. With `queue` and `include_jobs: true` it pages through the queue's pending job payloads:
+
+```json
+{
+  "queue": "imports", "size": 84,
+  "jobs": [
+    { "class": "ImportWorker", "args_preview": "[812, \"s3://bucket/batch-7.csv\"]" },
+    { "class": "ImportWorker", "args_preview": "[813, \"s3://bucket/batch-8.csv\"]" }
+  ],
+  "page": { "total": 84, "offset": 0, "limit": 2, "returned": 2, "has_more": true, "next_offset": 2 },
+  "meta": { "…": "…" }
+}
+```
+
+Every paginated response carries this `page` envelope. Limits are capped at 100 — a larger request is clamped and the clamp noted in the response.
+
+### `list_failures` — read-only
+
+Page through failed jobs, newest first, as compact records (truncated error, args preview, no backtrace). Optionally filter by `class_name`.
+
+```json
+{
+  "failures": [
+    {
+      "index": 1341, "failed_at": "2026/07/02 08:59:12 UTC",
+      "queue": "imports", "class": "ImportWorker",
+      "args_preview": "[812, \"s3://bucket/batch-7.csv\"]",
+      "exception": "PG::ConnectionBad",
+      "error": "could not connect to server: Connection refused… (truncated)",
+      "retried_at": null
+    }
+  ],
+  "page": { "total": 1342, "offset": 0, "limit": 20, "returned": 20, "has_more": true, "next_offset": 20 },
+  "meta": { "…": "…" }
+}
+```
+
+- A failure's `index` is its position in the failed list, deliberately not called an `id`: indexes shift when failures are removed, so re-list after any removal.
+- Under a `class_name` filter, `next_offset` is a raw scan cursor — continue paging with the returned value, never compute `offset + limit` yourself. Filtered totals cost a full-list scan and are marked `"total_note": "scan"`.
+
+### `get_failure` — read-only
+
+Full detail for one failed job by `index`: complete args, exception, full error, backtrace (capped at 30 frames, with `backtrace_omitted`), and the worker that failed it.
+
+All truncation anywhere in the tool surface is marked in-band (`"… (truncated)"`, `backtrace_omitted`), so a model always knows when it is seeing an excerpt.
+
+### Failure backends
+
+Both failure tools support Resque's `redis_multi_queue` failure backend: pass the failure-queue name as `queue`. On that backend the tools require it and answer with the list of failure queues when it is missing. On the default backend, `queue` can simply be omitted.
+
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `bundle exec rake` to run the tests and standardrb. You can also run `bin/console` for an interactive prompt.
+
+To release a new version, update the changelog and the version number in version.rb, commit it, and then run bundle exec rake release, which will create a git tag for the version, push git commits and the created tag, and push the .gem file to rubygems.org.
 
 ## Contributing
 
