@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "resque"
+require "resque/failure/redis"
 require "resque/failure/redis_multi_queue"
 require "mock_redis"
 
@@ -8,6 +9,7 @@ require "mock_redis"
 module ResqueTestHelpers
   def reset_resque!
     Resque.redis = MockRedis.new
+    Resque::Failure.backend = Resque::Failure::Redis
   end
 
   def seed_jobs(queue, klass, count: 1, args: [])
