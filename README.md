@@ -1,5 +1,7 @@
 # resque-mcp
 
+[![Gem Version](https://badge.fury.io/rb/resque-mcp.svg)](https://rubygems.org/gems/resque-mcp)
+
 An MCP server for [Resque](https://github.com/resque/resque), mountable as a Rails engine. Lets MCP clients (e.g. Claude Code) inspect queues, workers, and failed jobs — and retry or clear failures — over a single authenticated Streamable HTTP endpoint.
 
 ## Requirements
@@ -10,12 +12,14 @@ An MCP server for [Resque](https://github.com/resque/resque), mountable as a Rai
 
 ## Installation
 
-Not yet published to RubyGems. Until then, install from git:
+Add the gem to your application's Gemfile:
 
 ```ruby
 # Gemfile
-gem "resque-mcp", github: "jbockler/resque-mcp"
+gem "resque-mcp"
 ```
+
+Then run `bundle install`. Or install it yourself with `gem install resque-mcp`.
 
 ## Usage
 
