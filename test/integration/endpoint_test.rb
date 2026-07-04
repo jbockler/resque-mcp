@@ -22,8 +22,25 @@ module Resque
 
         assert_response :ok
         tools = response.parsed_body.dig("result", "tools")
-        assert_equal ["get_failure", "list_failures", "overview", "queue_stats"],
+        assert_equal ["get_failure", "list_failures", "overview", "queue_stats", "worker_stats"],
           tools.map { |t| t["name"] }.sort
+      end
+
+      def test_worker_stats_tool_call_round_trips
+        reset_resque!
+        worker = seed_worker("imports", hostname: "host-a", pid: 4021)
+        start_working(worker, queue: "imports", klass: "ImportWorker", args: [812])
+
+        post_jsonrpc(method: "tools/call", params: {name: "worker_stats", arguments: {}})
+
+        assert_response :ok
+        result = response.parsed_body.fetch("result")
+        refute result["isError"]
+        content = result.fetch("structuredContent")
+        assert_equal 1, content.dig("counts", "working")
+        record = content["workers"].first
+        assert_equal "host-a:4021:imports", record["id"]
+        assert_equal "[812]", record.dig("current_job", "args_preview")
       end
 
       def test_failure_tools_round_trip

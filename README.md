@@ -58,7 +58,7 @@ Then ask, e.g., "How is my Resque doing?"
 
 ## Tools
 
-The tool surface is read-only so far (worker inspection and failure retry/clear are planned). Every tool response returns structured JSON alongside a text body and ends in a `meta` footer naming the Rails environment and the Redis target (with any credentials stripped), so you always see what you are talking to.
+The tool surface is read-only so far (failure retry/clear are planned). Every tool response returns structured JSON alongside a text body and ends in a `meta` footer naming the Rails environment and the Redis target (with any credentials stripped), so you always see what you are talking to.
 
 ### `overview` — read-only
 
@@ -94,6 +94,30 @@ List all queues with sizes, or inspect a single queue. With `queue` and `include
 ```
 
 Every paginated response carries this `page` envelope. Limits are capped at 100 — a larger request is clamped and the clamp noted in the response.
+
+### `worker_stats` — read-only
+
+List registered workers with their current state, optionally filtered by `state` (`working` / `idle` / `all`):
+
+```json
+{
+  "workers": [
+    {
+      "id": "worker-host-1:4021:imports,default", "state": "working",
+      "queues": ["imports", "default"], "started": "2026-06-30 04:12:09 UTC",
+      "processed": 48211, "failed": 12, "heartbeat_expired": false,
+      "current_job": { "queue": "imports", "class": "ImportWorker",
+                       "args_preview": "[812, …]", "run_at": "2026-07-02T09:14:55Z" }
+    }
+  ],
+  "counts": { "total": 12, "working": 3, "idle": 9, "heartbeat_expired": 1 },
+  "page": { "total": 12, "offset": 0, "limit": 50, "returned": 12, "has_more": false, "next_offset": null },
+  "meta": { "…": "…" }
+}
+```
+
+- `heartbeat_expired: true` flags a worker whose last heartbeat is older than `Resque.prune_interval` — it is likely dead and its record stale.
+- `counts` always covers all workers; a `state` filter only narrows the `workers` list (and its `page` envelope).
 
 ### `list_failures` — read-only
 

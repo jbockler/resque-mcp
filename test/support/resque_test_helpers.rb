@@ -16,10 +16,22 @@ module ResqueTestHelpers
     count.times { Resque::Job.create(queue, klass, *args) }
   end
 
-  def seed_worker(*queues)
+  def seed_worker(*queues, hostname: nil, pid: nil)
     worker = Resque::Worker.new(*queues)
+    worker.hostname = hostname if hostname
+    worker.pid = pid if pid
     worker.register_worker
     worker
+  end
+
+  def start_working(worker, queue: "default", klass: "SomeJob", args: [])
+    worker.working_on(Resque::Job.new(queue, {"class" => klass, "args" => args}))
+  end
+
+  # Workers that never sent a heartbeat are NOT flagged as expired —
+  # only a stale one older than prune_interval is.
+  def expire_heartbeat(worker)
+    worker.heartbeat!(Time.now - Resque.prune_interval - 60)
   end
 
   def with_filter_parameters(list)

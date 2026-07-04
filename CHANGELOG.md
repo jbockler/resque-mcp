@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- `worker_stats` tool: list registered workers (state, subscribed queues, per-worker processed/failed counts, start time, current job with filtered args preview) with a `state` filter (`working`/`idle`/`all`), global counts including `heartbeat_expired`, and the standard pagination envelope. Workers whose heartbeat is older than `Resque.prune_interval` are flagged as likely dead.
 - Parameter filtering: job args in all tool responses are masked with `[FILTERED]` via `ActiveSupport::ParameterFilter` before any preview/truncation. Inherits `Rails.application.config.filter_parameters` by default; `Resque::Mcp.configure { |c| c.filter_parameters = [...] }` replaces the list (`[]` disables).
 
 ## [0.2.0]
