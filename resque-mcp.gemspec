@@ -35,6 +35,7 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "resque", ">= 2.7", "< 4"
   spec.add_dependency "mcp", "~> 0.22"
+  spec.add_dependency "activesupport", ">= 7.2"
   spec.add_dependency "railties", ">= 7.2"
   spec.add_dependency "zeitwerk", ">= 2.6"
 end

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Parameter filtering: job args in all tool responses are masked with `[FILTERED]` via `ActiveSupport::ParameterFilter` before any preview/truncation. Inherits `Rails.application.config.filter_parameters` by default; `Resque::Mcp.configure { |c| c.filter_parameters = [...] }` replaces the list (`[]` disables).
+
 ## [0.2.0]
 
 - `list_failures` tool: page through failed jobs newest-first with compact records (truncated error, args preview, no backtrace); optional `class_name` filter (filtered totals are marked `"total_note": "scan"` and paging must follow the returned `next_offset` cursor).

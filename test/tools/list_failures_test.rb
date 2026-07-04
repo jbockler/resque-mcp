@@ -96,6 +96,32 @@ module Resque
         refute response.error?
       end
 
+      def test_filters_configured_parameters_out_of_args_preview
+        seed_failure(args: [{"password" => "hunter2", "batch" => 7}])
+
+        response = with_filter_parameters([:password]) do
+          Tools::ListFailures.call(server_context: server_context)
+        end
+
+        preview = response.structured_content[:failures].first[:args_preview]
+        refute_includes preview, "hunter2"
+        assert_includes preview, "[FILTERED]"
+        assert_includes preview, "7"
+      end
+
+      # There is no synthetic wrapper key: a filter matching "args" must
+      # not blank out entire argument lists.
+      def test_filters_matching_the_word_args_do_not_mask_everything
+        seed_failure(args: [812, {"target" => "s3://bucket"}])
+
+        response = with_filter_parameters(["args"]) do
+          Tools::ListFailures.call(server_context: server_context)
+        end
+
+        assert_equal "[812,{\"target\":\"s3://bucket\"}]",
+          response.structured_content[:failures].first[:args_preview]
+      end
+
       private
 
       def server_context

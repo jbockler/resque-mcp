@@ -4,6 +4,7 @@ require "json"
 require "resque"
 require "mcp"
 require "zeitwerk"
+require "active_support/parameter_filter"
 
 require_relative "mcp/version"
 

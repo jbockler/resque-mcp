@@ -22,6 +22,14 @@ module ResqueTestHelpers
     worker
   end
 
+  def with_filter_parameters(list)
+    original = Resque::Mcp.config.filter_parameters
+    Resque::Mcp.config.filter_parameters = list
+    yield
+  ensure
+    Resque::Mcp.config.filter_parameters = original
+  end
+
   # A real failure record via Resque::Failure.create; the exception is
   # raised and rescued so it carries a genuine backtrace.
   def seed_failure(queue: "default", klass: "FailingJob", args: [], message: "boom",

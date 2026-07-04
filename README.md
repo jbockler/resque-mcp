@@ -33,10 +33,19 @@ mount Resque::Mcp::Engine => "/resque-mcp"
 Resque::Mcp.configure do |c|
   # token could be created by e.g.: `bin/rails runner 'puts SecureRandom.base58(32)'`
   c.auth_token = Rails.application.credentials.dig(:resque_mcp, :token)
+
+  # Optional: which job-args keys to mask as [FILTERED] in tool responses.
+  # Defaults to your app's config.filter_parameters; an explicit list
+  # replaces it (merge yourself if you want both):
+  # c.filter_parameters = Rails.application.config.filter_parameters + [:iban]
 end
 ```
 
 The token is **required** — the endpoint answers `503` until one is configured, and `401` on any request without a matching `Authorization: Bearer` header. The engine talks to whatever `Resque.redis` your app already configured; it never opens its own Redis connection.
+
+Job arguments shown by any tool are filtered through `ActiveSupport::ParameterFilter` **before** preview/truncation, using your Rails `filter_parameters` by default — the same keys you hide from your logs are hidden from the model. Filters match hash keys (at any depth, same semantics as Rails log filtering, including anchored dot-notation like `/\Acredit_card\.code\z/`); positional scalar args have no key and pass through. Set `c.filter_parameters = []` to disable.
+
+Scope honestly stated: filtering covers **job args only**. Exception messages and backtraces in failure records are shown unfiltered (Rails doesn't scrub those from logs either) — a secret interpolated into an exception message will be visible, so treat error text accordingly.
 
 Connect Claude Code:
 

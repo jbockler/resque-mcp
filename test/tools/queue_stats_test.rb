@@ -117,6 +117,18 @@ module Resque
         refute response.error?
       end
 
+      def test_filters_configured_parameters_out_of_job_previews
+        seed_jobs("imports", "ImportWorker", args: [{"password" => "hunter2"}])
+
+        response = with_filter_parameters([:password]) do
+          Tools::QueueStats.call(queue: "imports", include_jobs: true, server_context: server_context)
+        end
+
+        preview = response.structured_content[:jobs].first[:args_preview]
+        refute_includes preview, "hunter2"
+        assert_includes preview, "[FILTERED]"
+      end
+
       private
 
       def server_context
