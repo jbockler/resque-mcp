@@ -87,6 +87,16 @@ module Resque
         normalize_failure(index, item)
       end
 
+      # Normalized snapshot of all registered workers, sorted by id so
+      # pagination over the unordered Redis set is deterministic.
+      # `started` is an opaque string (never parsed, like failed_at).
+      def workers
+        expired_ids = @resque::Worker.all_workers_with_expired_heartbeats.map(&:to_s)
+        @resque.workers
+          .map { |worker| normalize_worker(worker, expired_ids) }
+          .sort_by { |record| record[:id] }
+      end
+
       # Resque.redis_id can embed user:password@; only this stripped form
       # may reach tool responses.
       def redis_identifier
@@ -148,6 +158,26 @@ module Resque
           total_note: "scan",
           has_more: has_more,
           next_offset: has_more ? cursor_after_last : nil
+        }
+      end
+
+      def normalize_worker(worker, expired_ids)
+        id = worker.to_s
+        job = worker.job
+        {
+          id: id,
+          state: job.empty? ? "idle" : "working",
+          queues: worker.queues,
+          started: worker.started,
+          processed: worker.processed,
+          failed: worker.failed,
+          heartbeat_expired: expired_ids.include?(id),
+          current_job: job.empty? ? nil : {
+            queue: job["queue"],
+            class: job.dig("payload", "class"),
+            args: job.dig("payload", "args"),
+            run_at: job["run_at"]
+          }
         }
       end
 
