@@ -38,36 +38,16 @@ module Resque
             page
           end
 
-          def args_preview(args)
-            truncate_text(JSON.generate(filter_args(args)), ARGS_PREVIEW_MAX)
+          # Both take a Models::Job — raw args are sealed inside it
+          # (filtering already applied); these helpers only truncate.
+          def args_preview(job)
+            truncate_text(JSON.generate(job.filtered_args), ARGS_PREVIEW_MAX)
           end
 
-          def full_args(args)
-            args = filter_args(args)
+          def full_args(job)
+            args = job.filtered_args
             json = JSON.generate(args)
             (json.length <= ARGS_FULL_MAX) ? args : truncate_text(json, ARGS_FULL_MAX)
-          end
-
-          # Key-based filtering (filter_parameters) runs BEFORE any
-          # preview/truncation so a secret can't survive inside a truncated
-          # JSON string. Each hash arg is filtered as its own root, so
-          # anchored dot-notation filters (/\Acredit_card\.code\z/) match
-          # exactly as they do in Rails log filtering. Only hash keys can
-          # match — bare positional scalars pass through. A raising host
-          # filter (e.g. a proc assuming string values) fails CLOSED:
-          # args are withheld with an in-band mark, never leaked.
-          def filter_args(args)
-            filter_value(Resque::Mcp.config.param_filter, args)
-          rescue => e
-            "[args withheld: filter_parameters raised #{e.class}]"
-          end
-
-          def filter_value(param_filter, value)
-            case value
-            when Hash then param_filter.filter(value)
-            when Array then value.map { |element| filter_value(param_filter, element) }
-            else value
-            end
           end
 
           def truncated_error(error)

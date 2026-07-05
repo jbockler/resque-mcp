@@ -62,7 +62,7 @@ module Resque
         result = @adapter.peek("imports", offset: 1, limit: 2)
 
         assert_equal 3, result[:size]
-        assert_equal [[1], [2]], result[:jobs].map { |j| j["args"] }
+        assert_equal [[1], [2]], result[:jobs].map(&:filtered_args)
       end
 
       # Pin the resque quirk: peek with count == 1 returns a bare hash.
@@ -71,7 +71,11 @@ module Resque
 
         result = @adapter.peek("imports", offset: 0, limit: 1)
 
-        assert_equal [{"class" => "ImportWorker", "args" => [812]}], result[:jobs]
+        job = result[:jobs].first
+        assert_equal 1, result[:jobs].size
+        assert_equal "ImportWorker", job.class_name
+        assert_equal [812], job.filtered_args
+        assert_equal "imports", job.queue
       end
 
       def test_peek_beyond_end_returns_empty_jobs

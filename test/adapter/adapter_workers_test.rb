@@ -21,14 +21,14 @@ module Resque
 
         record = @adapter.workers.first
 
-        assert_equal "host-a:4021:imports,default", record[:id]
-        assert_equal "idle", record[:state]
-        assert_equal ["imports", "default"], record[:queues]
-        assert_kind_of String, record[:started]
-        assert_equal 0, record[:processed]
-        assert_equal 0, record[:failed]
-        refute record[:heartbeat_expired]
-        assert_nil record[:current_job]
+        assert_equal "host-a:4021:imports,default", record.id
+        assert_equal "idle", record.state
+        assert_equal ["imports", "default"], record.queues
+        assert_kind_of String, record.started
+        assert_equal 0, record.processed
+        assert_equal 0, record.failed
+        refute record.heartbeat_expired
+        assert_nil record.current_job
       end
 
       def test_working_worker_carries_current_job
@@ -37,12 +37,12 @@ module Resque
 
         record = @adapter.workers.first
 
-        assert_equal "working", record[:state]
-        job = record[:current_job]
-        assert_equal "imports", job[:queue]
-        assert_equal "ImportWorker", job[:class]
-        assert_equal [812], job[:args]
-        assert_kind_of String, job[:run_at]
+        assert_equal "working", record.state
+        job = record.current_job
+        assert_equal "imports", job.queue
+        assert_equal "ImportWorker", job.class_name
+        assert_equal [812], job.filtered_args
+        assert_kind_of String, job.run_at
       end
 
       def test_per_worker_processed_and_failed_counts
@@ -52,8 +52,8 @@ module Resque
 
         record = @adapter.workers.first
 
-        assert_equal 2, record[:processed]
-        assert_equal 1, record[:failed]
+        assert_equal 2, record.processed
+        assert_equal 1, record.failed
       end
 
       def test_stale_heartbeat_flags_expired
@@ -62,16 +62,16 @@ module Resque
         expire_heartbeat(stale)
         fresh.heartbeat!
 
-        by_id = @adapter.workers.to_h { |r| [r[:id], r] }
+        by_id = @adapter.workers.to_h { |r| [r.id, r] }
 
-        assert by_id["host-a:1:imports"][:heartbeat_expired]
-        refute by_id["host-b:2:imports"][:heartbeat_expired]
+        assert by_id["host-a:1:imports"].heartbeat_expired
+        refute by_id["host-b:2:imports"].heartbeat_expired
       end
 
       def test_worker_without_any_heartbeat_is_not_flagged
         seed_worker("imports")
 
-        refute @adapter.workers.first[:heartbeat_expired]
+        refute @adapter.workers.first.heartbeat_expired
       end
 
       def test_workers_are_sorted_by_id
@@ -79,7 +79,7 @@ module Resque
         seed_worker("imports", hostname: "host-a", pid: 9)
         seed_worker("imports", hostname: "host-a", pid: 1)
 
-        ids = @adapter.workers.map { |r| r[:id] }
+        ids = @adapter.workers.map(&:id)
 
         assert_equal ids.sort, ids
       end

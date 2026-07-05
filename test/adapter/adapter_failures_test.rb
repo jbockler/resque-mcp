@@ -17,8 +17,8 @@ module Resque
 
         result = @adapter.failures(offset: 0, limit: 2)
 
-        assert_equal [[2], [1]], result[:records].map { |r| r[:args] }
-        assert_equal [2, 1], result[:records].map { |r| r[:index] }
+        assert_equal [[2], [1]], result[:records].map { |r| r.job.filtered_args }
+        assert_equal [2, 1], result[:records].map { |r| r.index }
         assert_equal 3, result[:total]
         assert result[:has_more]
         assert_equal 2, result[:next_offset]
@@ -29,8 +29,8 @@ module Resque
 
         result = @adapter.failures(offset: 2, limit: 2)
 
-        assert_equal [[0]], result[:records].map { |r| r[:args] }
-        assert_equal [0], result[:records].map { |r| r[:index] }
+        assert_equal [[0]], result[:records].map { |r| r.job.filtered_args }
+        assert_equal [0], result[:records].map { |r| r.index }
         refute result[:has_more]
         assert_nil result[:next_offset]
       end
@@ -51,7 +51,7 @@ module Resque
 
         result = @adapter.failures(offset: 0, limit: 20)
 
-        assert_equal [[1], [0]], result[:records].map { |r| r[:args] }
+        assert_equal [[1], [0]], result[:records].map { |r| r.job.filtered_args }
         refute result[:has_more]
         assert_nil result[:next_offset]
       end
@@ -61,7 +61,7 @@ module Resque
 
         result = @adapter.failures(offset: 0, limit: 1)
 
-        assert_equal [[812]], result[:records].map { |r| r[:args] }
+        assert_equal [[812]], result[:records].map { |r| r.job.filtered_args }
       end
 
       def test_records_are_fully_normalized
@@ -69,17 +69,17 @@ module Resque
 
         record = @adapter.failures(offset: 0, limit: 1)[:records].first
 
-        assert_equal 0, record[:index]
-        assert_equal "imports", record[:queue]
-        assert_equal "ImportWorker", record[:class]
-        assert_equal [812], record[:args]
-        assert_equal "RuntimeError", record[:exception]
-        assert_includes record[:error], "boom"
-        assert_kind_of Array, record[:backtrace]
-        refute_empty record[:backtrace]
-        assert record[:failed_at]
-        assert record[:worker]
-        assert_nil record[:retried_at]
+        assert_equal 0, record.index
+        assert_equal "imports", record.queue
+        assert_equal "ImportWorker", record.job.class_name
+        assert_equal [812], record.job.filtered_args
+        assert_equal "RuntimeError", record.exception
+        assert_includes record.error, "boom"
+        assert_kind_of Array, record.backtrace
+        refute_empty record.backtrace
+        assert record.failed_at
+        assert record.worker
+        assert_nil record.retried_at
       end
 
       def test_filtered_paging_walks_all_matches_without_skip_or_repeat
@@ -92,7 +92,7 @@ module Resque
         offset = 0
         loop do
           result = @adapter.failures(offset: offset, limit: 2, class_name: "JobA")
-          seen.concat(result[:records].map { |r| r[:args].first })
+          seen.concat(result[:records].map { |r| r.job.filtered_args.first })
           assert_operator result[:records].size, :<=, 2
           break unless result[:has_more]
           offset = result[:next_offset]
@@ -110,7 +110,7 @@ module Resque
 
         assert_equal 2, result[:total]
         assert_equal "scan", result[:total_note]
-        assert_equal [2, 0], result[:records].map { |r| r[:index] }
+        assert_equal [2, 0], result[:records].map { |r| r.index }
         refute result[:has_more]
       end
 
@@ -120,7 +120,7 @@ module Resque
 
         result = @adapter.failures(offset: 0, limit: 20, class_name: "JobA")
 
-        assert_equal [1], result[:records].map { |r| r[:index] }
+        assert_equal [1], result[:records].map { |r| r.index }
       end
 
       def test_filtered_scan_crosses_chunk_boundaries
@@ -129,7 +129,7 @@ module Resque
 
         result = @adapter.failures(offset: 0, limit: 20, class_name: "Rare")
 
-        assert_equal [100, 50, 0], result[:records].map { |r| r[:args].first }
+        assert_equal [100, 50, 0], result[:records].map { |r| r.job.filtered_args.first }
         refute result[:has_more]
       end
 
@@ -139,8 +139,8 @@ module Resque
 
         record = @adapter.failure(0)
 
-        assert_equal "JobA", record[:class]
-        assert_equal [0], record[:args]
+        assert_equal "JobA", record.job.class_name
+        assert_equal [0], record.job.filtered_args
       end
 
       def test_failure_out_of_range_raises_with_current_count
@@ -208,7 +208,7 @@ module Resque
 
         result = @adapter.failures(offset: 0, limit: 20, queue: "alpha_failed")
 
-        assert_equal [[2], [0]], result[:records].map { |r| r[:args] }
+        assert_equal [[2], [0]], result[:records].map { |r| r.job.filtered_args }
         assert_equal 2, result[:total]
         refute result[:has_more]
       end
@@ -225,7 +225,7 @@ module Resque
 
         record = @adapter.failure(0, queue: "alpha_failed")
 
-        assert_equal [812], record[:args]
+        assert_equal [812], record.job.filtered_args
       end
     end
   end

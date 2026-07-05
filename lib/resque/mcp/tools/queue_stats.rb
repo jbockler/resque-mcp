@@ -32,7 +32,7 @@ module Resque
           clamped = clamp_limit(limit)
           result = adapter(server_context).peek(queue, offset: offset, limit: clamped)
           jobs = result[:jobs].map do |job|
-            {class: job["class"], args_preview: args_preview(job["args"])}
+            {class: job.class_name, args_preview: args_preview(job)}
           end
           success_response({
             queue: queue,
