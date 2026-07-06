@@ -54,14 +54,23 @@ module Resque
       end
 
       def test_failure_and_worker_inspect_do_not_leak_nested_job_args
-        job = Models::Job.new(class_name: "ImportWorker", args: [{"password" => "hunter2"}])
-        failure = Models::Failure.new(index: 0, failed_at: "x", queue: "imports",
-          exception: "E", error: "e", backtrace: [], worker: "w", retried_at: nil, job: job)
-        worker = Models::Worker.new(id: "h:1:imports", state: "working", queues: ["imports"],
-          started: "x", processed: 0, failed: 0, heartbeat_expired: false, current_job: job)
+        failure, worker = nested_job_records
 
+        assert_includes failure.inspect, "args=[sealed]"
+        assert_includes worker.inspect, "args=[sealed]"
         refute_includes failure.inspect, "hunter2"
         refute_includes worker.inspect, "hunter2"
+      end
+
+      def test_failure_and_worker_to_json_mask_nested_job_args
+        failure, worker = nested_job_records
+
+        with_filter_parameters([:password]) do
+          assert_includes failure.to_json, "[FILTERED]"
+          assert_includes worker.to_json, "[FILTERED]"
+          refute_includes failure.to_json, "hunter2"
+          refute_includes worker.to_json, "hunter2"
+        end
       end
 
       def test_raising_host_filter_fails_closed
@@ -71,6 +80,17 @@ module Resque
 
         assert_equal "[args withheld: filter_parameters raised TypeError]", filtered
         refute_includes filtered.inspect, "hunter2"
+      end
+
+      private
+
+      def nested_job_records
+        job = Models::Job.new(class_name: "ImportWorker", args: [{"password" => "hunter2"}])
+        failure = Models::Failure.new(index: 0, failed_at: "x", queue: "imports",
+          exception: "E", error: "e", backtrace: [], worker: "w", retried_at: nil, job: job)
+        worker = Models::Worker.new(id: "h:1:imports", state: "working", queues: ["imports"],
+          started: "x", processed: 0, failed: 0, heartbeat_expired: false, current_job: job)
+        [failure, worker]
       end
     end
   end
