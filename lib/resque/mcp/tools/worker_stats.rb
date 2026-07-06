@@ -28,19 +28,19 @@ module Resque
           all = adapter(server_context).workers
           counts = {
             total: all.size,
-            working: all.count { |w| w[:state] == "working" },
-            idle: all.count { |w| w[:state] == "idle" },
-            heartbeat_expired: all.count { |w| w[:heartbeat_expired] }
+            working: all.count(&:working?),
+            idle: all.count(&:idle?),
+            heartbeat_expired: all.count(&:heartbeat_expired)
           }
-          selected = (state == "all") ? all : all.select { |w| w[:state] == state }
+          selected = (state == "all") ? all : all.select { |w| w.state == state }
           clamped = clamp_limit(limit)
           workers = (selected[offset, clamped] || []).map do |record|
-            job = record[:current_job]
-            record.merge(current_job: job && {
-              queue: job[:queue],
-              class: job[:class],
-              args_preview: args_preview(job[:args]),
-              run_at: job[:run_at]
+            job = record.current_job
+            record.to_h.merge(current_job: job && {
+              queue: job.queue,
+              class: job.class_name,
+              args_preview: args_preview(job),
+              run_at: job.run_at
             })
           end
           success_response({

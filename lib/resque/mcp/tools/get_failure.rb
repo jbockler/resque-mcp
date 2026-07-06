@@ -19,19 +19,19 @@ module Resque
 
         def self.call(index:, server_context:, queue: nil, **)
           record = adapter(server_context).failure(index, queue: queue)
-          backtrace, omitted = capped_backtrace(record[:backtrace])
+          backtrace, omitted = capped_backtrace(record.backtrace)
           success_response({
-            index: record[:index],
-            failed_at: record[:failed_at],
-            queue: record[:queue],
-            class: record[:class],
-            args: full_args(record[:args]),
-            exception: record[:exception],
-            error: record[:error],
+            index: record.index,
+            failed_at: record.failed_at,
+            queue: record.queue,
+            class: record.job.class_name,
+            args: full_args(record.job),
+            exception: record.exception,
+            error: record.error,
             backtrace: backtrace,
             backtrace_omitted: omitted,
-            worker: record[:worker],
-            retried_at: record[:retried_at]
+            worker: record.worker,
+            retried_at: record.retried_at
           }, server_context)
         rescue Adapter::FailureOutOfRangeError, Adapter::FailureQueueRequiredError, ArgumentError => e
           error_response(e.message)

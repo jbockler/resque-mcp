@@ -28,14 +28,14 @@ module Resque
           )
           failures = result[:records].map do |record|
             {
-              index: record[:index],
-              failed_at: record[:failed_at],
-              queue: record[:queue],
-              class: record[:class],
-              args_preview: args_preview(record[:args]),
-              exception: record[:exception],
-              error: truncated_error(record[:error]),
-              retried_at: record[:retried_at]
+              index: record.index,
+              failed_at: record.failed_at,
+              queue: record.queue,
+              class: record.job.class_name,
+              args_preview: args_preview(record.job),
+              exception: record.exception,
+              error: truncated_error(record.error),
+              retried_at: record.retried_at
             }
           end
           success_response({

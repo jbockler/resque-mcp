@@ -58,7 +58,10 @@ module Resque
 
       def peek(queue, offset:, limit:)
         ensure_known_queue!(queue)
-        {size: @resque.size(queue), jobs: to_array(@resque.peek(queue, offset, limit))}
+        jobs = to_array(@resque.peek(queue, offset, limit)).map do |item|
+          build_job(item, queue: queue)
+        end
+        {size: @resque.size(queue), jobs: jobs}
       end
 
       # Newest-first pagination over the failed list. `offset` counts raw
@@ -94,7 +97,7 @@ module Resque
         expired_ids = @resque::Worker.all_workers_with_expired_heartbeats.map(&:to_s)
         @resque.workers
           .map { |worker| normalize_worker(worker, expired_ids) }
-          .sort_by { |record| record[:id] }
+          .sort_by(&:id)
       end
 
       # Resque.redis_id can embed user:password@; only this stripped form
@@ -164,7 +167,7 @@ module Resque
       def normalize_worker(worker, expired_ids)
         id = worker.to_s
         job = worker.job
-        {
+        Models::Worker.new(
           id: id,
           state: job.empty? ? "idle" : "working",
           queues: worker.queues,
@@ -172,29 +175,28 @@ module Resque
           processed: worker.processed,
           failed: worker.failed,
           heartbeat_expired: expired_ids.include?(id),
-          current_job: job.empty? ? nil : {
-            queue: job["queue"],
-            class: job.dig("payload", "class"),
-            args: job.dig("payload", "args"),
-            run_at: job["run_at"]
-          }
-        }
+          current_job: job.empty? ? nil : build_job(job["payload"], queue: job["queue"], run_at: job["run_at"])
+        )
+      end
+
+      # The single place mapping resque's payload keys to Models::Job.
+      def build_job(payload, queue: nil, run_at: nil)
+        payload ||= {}
+        Models::Job.new(class_name: payload["class"], args: payload["args"], queue: queue, run_at: run_at)
       end
 
       def normalize_failure(index, item)
-        payload = item["payload"] || {}
-        {
+        Models::Failure.new(
           index: index,
           failed_at: item["failed_at"],
           queue: item["queue"],
-          class: payload["class"],
-          args: payload["args"],
           exception: item["exception"],
           error: item["error"],
           backtrace: item["backtrace"],
           worker: item["worker"],
-          retried_at: item["retried_at"]
-        }
+          retried_at: item["retried_at"],
+          job: build_job(item["payload"])
+        )
       end
 
       # Resque's list reads (Resque.peek, Failure.all) return a bare hash
