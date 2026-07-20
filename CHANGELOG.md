@@ -4,6 +4,7 @@
 
 - Security: bump the minimum `mcp` dependency to `>= 0.23, < 1` for the DNS-rebinding fix (CVE-2026-63118); `<= 0.22` did not validate `Host`/`Origin` headers on the Streamable HTTP transport. Protection is now on by default, with loopback always allowed.
 - Config: `allowed_hosts` and `allowed_origins` for the DNS-rebinding allowlists. `allowed_hosts` defaults to inheriting the host's Rails `config.hosts` string entries, so apps that already configure Rails host authorization need nothing extra; an explicit list replaces it, and `[]` allows loopback only.
+- Config: `mcp_transport_options` forwards arbitrary settings to the mcp gem's transport (e.g. `max_request_bytes`); the DNS-rebinding keys always override it, so it can tune but never weaken protection.
 
 ## [0.3.0]
 

@@ -8,13 +8,16 @@ module Resque
       def handle
         server = ServerFactory.build(environment: Rails.env.to_s)
         config = Resque::Mcp.config
-        transport = ::MCP::Server::Transports::StreamableHTTPTransport.new(
-          server,
+        # Passthrough first; our security-critical keys override, so nothing
+        # in mcp_transport_options can weaken the DNS-rebinding posture.
+        options = config.mcp_transport_options.merge(
           stateless: true,
           enable_json_response: true,
+          dns_rebinding_protection: true,
           allowed_hosts: config.allowed_hosts,
           allowed_origins: config.allowed_origins
         )
+        transport = ::MCP::Server::Transports::StreamableHTTPTransport.new(server, **options)
 
         status, headers, body = transport.handle_request(request)
         headers.each { |key, value| response.set_header(key, value) }

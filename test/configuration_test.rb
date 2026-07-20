@@ -113,6 +113,13 @@ module Resque
         assert_equal ["https://resque.example.com"], config.allowed_origins
       end
 
+      def test_mcp_transport_options_default_empty_and_configurable
+        config = Configuration.new
+        assert_equal({}, config.mcp_transport_options)
+        config.mcp_transport_options = {max_request_bytes: 1_000}
+        assert_equal({max_request_bytes: 1_000}, config.mcp_transport_options)
+      end
+
       def test_nil_falls_back_to_the_rails_default_and_empty_list_disables
         with_filter_parameters(nil) do
           assert_equal({"password" => "[FILTERED]"}, Resque::Mcp.config.param_filter.filter({"password" => "x"}))

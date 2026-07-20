@@ -62,6 +62,24 @@ module Resque
         assert_response :forbidden
       end
 
+      # mcp_transport_options are forwarded to the SDK transport: a tiny
+      # max_request_bytes makes the normal initialize body too large → 413.
+      def test_mcp_transport_options_are_forwarded_to_the_transport
+        with_mcp_transport_options(max_request_bytes: 5) do
+          post_initialize
+          assert_response 413
+        end
+      end
+
+      # ...but a passthrough value cannot weaken the DNS-rebinding posture:
+      # disabling it via mcp_transport_options is overridden, so a bad Host still 403s.
+      def test_mcp_transport_options_cannot_disable_dns_rebinding_protection
+        with_mcp_transport_options(dns_rebinding_protection: false) do
+          post_initialize_with_host("attacker.example.com")
+          assert_response :forbidden
+        end
+      end
+
       def test_blank_configured_token_is_service_unavailable
         original = Resque::Mcp.config.auth_token
         Resque::Mcp.config.auth_token = ""
