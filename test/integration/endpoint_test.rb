@@ -22,8 +22,10 @@ module Resque
 
         assert_response :ok
         tools = response.parsed_body.dig("result", "tools")
-        assert_equal ["get_failure", "list_failures", "overview", "queue_stats", "worker_stats"],
+        assert_equal ["get_failure", "list_failures", "overview", "queue_stats", "retry_failure", "worker_stats"],
           tools.map { |t| t["name"] }.sort
+        retry_tool = tools.find { |t| t["name"] == "retry_failure" }
+        assert retry_tool.dig("annotations", "destructiveHint")
       end
 
       def test_worker_stats_tool_call_round_trips
@@ -67,6 +69,24 @@ module Resque
         content = result.fetch("structuredContent")
         assert_equal [812], content["args"]
         assert_kind_of Array, content["backtrace"]
+      end
+
+      def test_retry_failure_tool_call_round_trips
+        reset_resque!
+        seed_failure(queue: "imports", klass: "ImportWorker", args: [812])
+
+        post_jsonrpc(method: "tools/call", params: {
+          name: "retry_failure", arguments: {index: 0}
+        })
+
+        assert_response :ok
+        result = response.parsed_body.fetch("result")
+        refute result["isError"]
+        content = result.fetch("structuredContent")
+        assert_equal "ImportWorker", content.dig("retried", "class")
+        assert_equal false, content["record_removed"]
+        refute_nil Resque::Failure.all(0, 1)["retried_at"]
+        assert_equal({"class" => "ImportWorker", "args" => [812]}, Resque.peek("imports"))
       end
 
       def test_queue_stats_tool_call_round_trips

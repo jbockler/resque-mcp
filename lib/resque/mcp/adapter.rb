@@ -25,6 +25,15 @@ module Resque
         end
       end
 
+      class StaleFailureIndexError < StandardError
+        def initialize(index, item)
+          super("Failure at index #{index} no longer matches the expected record — " \
+            "found class #{item.dig("payload", "class").inspect}, " \
+            "queue #{item["queue"].inspect}, failed_at #{item["failed_at"].inspect}. " \
+            "Indexes shift on removals — re-list before acting again.")
+        end
+      end
+
       # Chunk size for the tail-backwards scan under a class_name filter.
       FILTER_SCAN_CHUNK = 100
 
@@ -82,11 +91,22 @@ module Resque
 
       def failure(index, queue: nil)
         ensure_failure_queue!(queue)
-        count = @resque::Failure.count(queue)
-        raise FailureOutOfRangeError.new(index, count) unless index >= 0 && index < count
-        item = to_array(@resque::Failure.all(index, 1, queue)).first
-        # The list can shrink between the count read and the fetch.
-        raise FailureOutOfRangeError.new(index, @resque::Failure.count(queue)) if item.nil?
+        normalize_failure(index, read_failure_item(index, queue))
+      end
+
+      # Re-enqueues the failed job onto its original queue (resque stamps
+      # retried_at on the record but keeps it), then optionally removes the
+      # record. The expected_* fingerprint guards against the index having
+      # shifted since the caller inspected the record; the re-read and the
+      # write are not atomic — cheap insurance, not a transaction.
+      def requeue_failure(index, remove: false, queue: nil,
+        expected_failed_at: nil, expected_class: nil, expected_queue: nil)
+        ensure_failure_queue!(queue)
+        item = read_failure_item(index, queue)
+        verify_failure_fingerprint!(index, item,
+          failed_at: expected_failed_at, class_name: expected_class, origin_queue: expected_queue)
+        @resque::Failure.requeue(index, queue)
+        @resque::Failure.remove(index, queue) if remove
         normalize_failure(index, item)
       end
 
@@ -107,6 +127,27 @@ module Resque
       end
 
       private
+
+      def read_failure_item(index, queue)
+        count = @resque::Failure.count(queue)
+        raise FailureOutOfRangeError.new(index, count) unless index >= 0 && index < count
+        item = to_array(@resque::Failure.all(index, 1, queue)).first
+        # The list can shrink between the count read and the fetch.
+        raise FailureOutOfRangeError.new(index, @resque::Failure.count(queue)) if item.nil?
+        item
+      end
+
+      # Only provided (non-nil) expectations are compared. failed_at is the
+      # fingerprint that matters — failed queues hold thousands of records
+      # with identical class and queue, so a shifted neighbor passes a
+      # class/queue check; the second-granular failed_at string (compared
+      # opaquely, never parsed) identifies the individual record.
+      def verify_failure_fingerprint!(index, item, failed_at:, class_name:, origin_queue:)
+        matches = (failed_at.nil? || item["failed_at"] == failed_at) &&
+          (class_name.nil? || item.dig("payload", "class") == class_name) &&
+          (origin_queue.nil? || item["queue"] == origin_queue)
+        raise StaleFailureIndexError.new(index, item) unless matches
+      end
 
       def unfiltered_failures(offset, limit, raw_total, queue)
         available = raw_total - offset

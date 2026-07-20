@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- `retry_failure` tool: re-enqueue one failed job by list index onto its original queue (Resque stamps `retried_at` and keeps the record; `remove: true` also deletes it, shifting the indexes above). Optional `expected_failed_at`/`expected_class`/`expected_queue` fingerprints abort the call when the index no longer points at the inspected record — `expected_failed_at` is the guard that matters, since indexes shift on removals. On the redis_multi_queue backend the tool requires the same explicit `queue` as the read failure tools.
+
 ## [0.3.0]
 
 - `worker_stats` tool: list registered workers (state, subscribed queues, per-worker processed/failed counts, start time, current job with filtered args preview) with a `state` filter (`working`/`idle`/`all`), global counts including `heartbeat_expired`, and the standard pagination envelope. Workers whose heartbeat is older than `Resque.prune_interval` are flagged as likely dead.

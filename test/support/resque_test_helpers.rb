@@ -42,6 +42,14 @@ module ResqueTestHelpers
     Resque::Mcp.config.filter_parameters = original
   end
 
+  # failed_at is an opaque string; rewriting it gives records distinct
+  # fingerprints (Failure.create only stamps second granularity).
+  def set_failure_failed_at(index, value)
+    item = Resque::Failure.all(index, 1)
+    item["failed_at"] = value
+    Resque.data_store.update_item_in_failed_queue(index, Resque.encode(item))
+  end
+
   # A real failure record via Resque::Failure.create; the exception is
   # raised and rescued so it carries a genuine backtrace.
   def seed_failure(queue: "default", klass: "FailingJob", args: [], message: "boom",
