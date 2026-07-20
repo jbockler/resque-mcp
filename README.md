@@ -34,6 +34,17 @@ Resque::Mcp.configure do |c|
   # token could be created by e.g.: `bin/rails runner 'puts SecureRandom.base58(32)'`
   c.auth_token = Rails.application.credentials.dig(:resque_mcp, :token)
 
+  # DNS-rebinding protection (CVE-2026-63118) rejects any Host outside the
+  # allowlist with 403; loopback (127.0.0.1/::1/localhost) is always allowed.
+  # By default the allowlist is inherited from your Rails config.hosts, so if
+  # that already lists your domain(s) you need nothing here. Only plain
+  # hostname strings are honored (here and when inherited) — regexps, IPAddrs,
+  # and ".sub.domain" wildcards are dropped, so give concrete hostnames:
+  # c.allowed_hosts = ["resque.example.com"]
+
+  # Optional: extra permitted Origin values beyond same-origin.
+  # c.allowed_origins = ["https://resque.example.com"]
+
   # Optional: which job-args keys to mask as [FILTERED] in tool responses.
   # Defaults to your app's config.filter_parameters; an explicit list
   # replaces it (merge yourself if you want both):
@@ -41,7 +52,7 @@ Resque::Mcp.configure do |c|
 end
 ```
 
-The token is **required** — the endpoint answers `503` until one is configured, and `401` on any request without a matching `Authorization: Bearer` header. The engine talks to whatever `Resque.redis` your app already configured; it never opens its own Redis connection.
+The token is **required** — the endpoint answers `503` until one is configured, and `401` on any request without a matching `Authorization: Bearer` header. The endpoint also validates the `Host`/`Origin` headers against DNS rebinding: the allowed hosts default to your Rails `config.hosts`, so a non-loopback request gets `403` unless its Host is in that list (or in an explicit `allowed_hosts`). The engine talks to whatever `Resque.redis` your app already configured; it never opens its own Redis connection.
 
 Job arguments shown by any tool are filtered through `ActiveSupport::ParameterFilter` **before** preview/truncation, using your Rails `filter_parameters` by default — the same keys you hide from your logs are hidden from the model. Filters match hash keys (at any depth, same semantics as Rails log filtering, including anchored dot-notation like `/\Acredit_card\.code\z/`); positional scalar args have no key and pass through. Set `c.filter_parameters = []` to disable.
 

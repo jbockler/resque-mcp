@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "ipaddr"
 
 module Resque
   module Mcp
@@ -54,6 +55,62 @@ module Resque
           refute_same before, Resque::Mcp.config.param_filter
           assert_equal({"secret" => "x"}, Resque::Mcp.config.param_filter.filter({"secret" => "x"}))
         end
+      end
+
+      def test_allowed_hosts_without_a_source_are_empty
+        config = Configuration.new
+        assert_equal [], config.allowed_hosts
+        assert_equal [], config.allowed_origins
+      end
+
+      def test_allowed_hosts_inherit_the_rails_config_hosts
+        config = Configuration.new
+        config.default_allowed_hosts = -> { ["resque.example.com", "admin.example.com"] }
+        assert_equal ["resque.example.com", "admin.example.com"], config.allowed_hosts
+      end
+
+      # config.hosts entries the SDK's exact-hostname matching can't use —
+      # regexps, IPAddrs, leading-dot subdomain wildcards — are skipped.
+      def test_allowed_hosts_inheritance_skips_unmappable_entries
+        config = Configuration.new
+        config.default_allowed_hosts = -> {
+          ["resque.example.com", /.*\.internal/, IPAddr.new("10.0.0.0/8"), ".example.com"]
+        }
+        assert_equal ["resque.example.com"], config.allowed_hosts
+      end
+
+      def test_explicit_allowed_hosts_replace_the_inherited_list
+        config = Configuration.new
+        config.default_allowed_hosts = -> { ["inherited.example.com"] }
+        config.allowed_hosts = ["explicit.example.com"]
+        assert_equal ["explicit.example.com"], config.allowed_hosts
+      end
+
+      # An explicit list is filtered too — a regexp (a natural mistake, since
+      # config.hosts accepts them) would otherwise crash the transport's
+      # downcase on every request.
+      def test_explicit_allowed_hosts_drop_unmappable_entries
+        config = Configuration.new
+        config.allowed_hosts = ["resque.example.com", /admin\.example\.com/, ".example.com"]
+        assert_equal ["resque.example.com"], config.allowed_hosts
+      end
+
+      def test_empty_allowed_hosts_disable_inheritance
+        config = Configuration.new
+        config.default_allowed_hosts = -> { ["inherited.example.com"] }
+        config.allowed_hosts = []
+        assert_equal [], config.allowed_hosts
+      end
+
+      def test_engine_wires_config_hosts_as_the_lazy_default
+        assert_respond_to Resque::Mcp.config.default_allowed_hosts, :call
+        assert_equal Rails.application.config.hosts, Resque::Mcp.config.default_allowed_hosts.call
+      end
+
+      def test_allowed_origins_are_configurable
+        config = Configuration.new
+        config.allowed_origins = ["https://resque.example.com"]
+        assert_equal ["https://resque.example.com"], config.allowed_origins
       end
 
       def test_nil_falls_back_to_the_rails_default_and_empty_list_disables

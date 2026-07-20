@@ -40,6 +40,28 @@ module Resque
         assert_response :ok
       end
 
+      # DNS-rebinding protection (CVE-2026-63118): a Host outside the
+      # configured allowlist is rejected before the request is handled.
+      def test_disallowed_host_is_forbidden
+        post_initialize_with_host("attacker.example.com")
+
+        assert_response :forbidden
+      end
+
+      def test_allowed_host_is_accepted
+        post_initialize_with_host("www.example.com")
+
+        assert_response :ok
+      end
+
+      # A cross-origin request (Origin not same-origin with the Host and not
+      # in allowed_origins) is rejected by the transport's validation.
+      def test_disallowed_origin_is_forbidden
+        post_initialize_with_origin("https://attacker.example.com")
+
+        assert_response :forbidden
+      end
+
       def test_blank_configured_token_is_service_unavailable
         original = Resque::Mcp.config.auth_token
         Resque::Mcp.config.auth_token = ""

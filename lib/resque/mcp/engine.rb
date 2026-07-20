@@ -14,6 +14,13 @@ module Resque
       initializer "resque_mcp.filter_parameters" do
         Resque::Mcp.config.default_filter_parameters = -> { Rails.application.config.filter_parameters }
       end
+
+      # allowed_hosts inherits the host's config.hosts (the same list Rails'
+      # own host authorization uses) unless explicitly configured, read
+      # lazily for the same reason as the filter list above.
+      initializer "resque_mcp.allowed_hosts" do
+        Resque::Mcp.config.default_allowed_hosts = -> { Rails.application.config.hosts }
+      end
     end
   end
 end

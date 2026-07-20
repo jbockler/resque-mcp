@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Security: bump the minimum `mcp` dependency to `>= 0.23, < 1` for the DNS-rebinding fix (CVE-2026-63118); `<= 0.22` did not validate `Host`/`Origin` headers on the Streamable HTTP transport. Protection is now on by default, with loopback always allowed.
+- Config: `allowed_hosts` and `allowed_origins` for the DNS-rebinding allowlists. `allowed_hosts` defaults to inheriting the host's Rails `config.hosts` string entries, so apps that already configure Rails host authorization need nothing extra; an explicit list replaces it, and `[]` allows loopback only.
+
 ## [0.3.0]
 
 - `worker_stats` tool: list registered workers (state, subscribed queues, per-worker processed/failed counts, start time, current job with filtered args preview) with a `state` filter (`working`/`idle`/`all`), global counts including `heartbeat_expired`, and the standard pagination envelope. Workers whose heartbeat is older than `Resque.prune_interval` are flagged as likely dead.
