@@ -30,6 +30,17 @@ module Resque
         @allowed_origins || []
       end
 
+      # Extra settings for the mcp gem, forwarded verbatim to its
+      # StreamableHTTPTransport (e.g. max_request_bytes:). Tuning only — the
+      # controller applies the security-critical keys (allowed_hosts,
+      # allowed_origins, stateless, dns_rebinding_protection) *after* these,
+      # so a passthrough value can never weaken them.
+      attr_writer :mcp_transport_options
+
+      def mcp_transport_options
+        @mcp_transport_options || {}
+      end
+
       # nil = inherit the host default (the engine wires Rails'
       # filter_parameters as a lazy source); an explicit list replaces it
       # ([] disables filtering).

@@ -45,6 +45,11 @@ Resque::Mcp.configure do |c|
   # Optional: extra permitted Origin values beyond same-origin.
   # c.allowed_origins = ["https://resque.example.com"]
 
+  # Optional: escape hatch for mcp settings this gem doesn't expose directly,
+  # forwarded to the transport (the DNS-rebinding keys above always take
+  # precedence and can't be weakened here):
+  # c.mcp_transport_options = { max_request_bytes: 8 * 1024 * 1024 }
+
   # Optional: which job-args keys to mask as [FILTERED] in tool responses.
   # Defaults to your app's config.filter_parameters; an explicit list
   # replaces it (merge yourself if you want both):

@@ -37,4 +37,12 @@ module McpRequestHelpers
   def default_authorization
     "Bearer #{Resque::Mcp.config.auth_token}"
   end
+
+  def with_mcp_transport_options(options)
+    original = Resque::Mcp.config.mcp_transport_options
+    Resque::Mcp.config.mcp_transport_options = options
+    yield
+  ensure
+    Resque::Mcp.config.mcp_transport_options = original
+  end
 end
