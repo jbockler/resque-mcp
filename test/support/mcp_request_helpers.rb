@@ -11,9 +11,11 @@ module McpRequestHelpers
     clientInfo: {name: "test-client", version: "0.0.1"}
   }.freeze
 
-  def post_jsonrpc(method:, params: {}, id: 1, authorization: default_authorization)
+  def post_jsonrpc(method:, params: {}, id: 1, authorization: default_authorization, host: nil, origin: nil)
+    host!(host) if host
     headers = {"Content-Type" => "application/json", "Accept" => "application/json"}
     headers["Authorization"] = authorization if authorization
+    headers["Origin"] = origin if origin
 
     post ENDPOINT,
       params: {jsonrpc: "2.0", id: id, method: method, params: params}.to_json,
@@ -22,6 +24,14 @@ module McpRequestHelpers
 
   def post_initialize(authorization: default_authorization)
     post_jsonrpc(method: "initialize", params: INITIALIZE_PARAMS, authorization: authorization)
+  end
+
+  def post_initialize_with_host(host)
+    post_jsonrpc(method: "initialize", params: INITIALIZE_PARAMS, host: host)
+  end
+
+  def post_initialize_with_origin(origin)
+    post_jsonrpc(method: "initialize", params: INITIALIZE_PARAMS, origin: origin)
   end
 
   def default_authorization

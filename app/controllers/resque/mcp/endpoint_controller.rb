@@ -7,8 +7,13 @@ module Resque
 
       def handle
         server = ServerFactory.build(environment: Rails.env.to_s)
+        config = Resque::Mcp.config
         transport = ::MCP::Server::Transports::StreamableHTTPTransport.new(
-          server, stateless: true, enable_json_response: true
+          server,
+          stateless: true,
+          enable_json_response: true,
+          allowed_hosts: config.allowed_hosts,
+          allowed_origins: config.allowed_origins
         )
 
         status, headers, body = transport.handle_request(request)
