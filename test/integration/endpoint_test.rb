@@ -145,11 +145,23 @@ module Resque
         skip "mcp < 1.2 has no SEP-2575 lifecycle" unless modern_lifecycle_supported?
         post_modern_jsonrpc(method: "subscriptions/listen", params: {notifications: {}})
 
-        assert_response :not_implemented
+        assert_response :ok
         assert_equal 1, response.parsed_body.fetch("id"), "the client must be able to correlate the refusal"
         error = response.parsed_body.fetch("error")
         assert_equal(-32601, error.fetch("code"))
         assert_includes error.fetch("message"), "subscriptions/listen"
+      end
+
+      # An over-trimmed capabilities hash turns these into -32603s.
+      def test_empty_prompt_and_resource_lists_are_served_not_internal_errors
+        {"resources/list" => "resources", "prompts/list" => "prompts"}.each do |method, key|
+          post_jsonrpc(method: method)
+
+          assert_response :ok
+          body = response.parsed_body
+          refute body.key?("error"), "#{method} answered with #{body["error"].inspect}"
+          assert_equal [], body.dig("result", key)
+        end
       end
 
       def test_discover_advertises_only_capabilities_the_endpoint_serves
@@ -159,8 +171,6 @@ module Resque
         assert_response :ok
         capabilities = response.parsed_body.fetch("result").fetch("capabilities")
         assert capabilities.key?("tools")
-        refute capabilities.key?("prompts")
-        refute capabilities.key?("resources")
         capabilities.each_value do |flags|
           refute flags.key?("listChanged"), "listChanged promises a stream this endpoint declines"
           refute flags.key?("subscribe"), "subscribe promises a stream this endpoint declines"
