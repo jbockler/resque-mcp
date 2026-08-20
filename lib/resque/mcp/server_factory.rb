@@ -10,6 +10,10 @@ module Resque
           name: "resque-mcp",
           version: Resque::Mcp::VERSION,
           tools: [Tools::Overview, Tools::QueueStats, Tools::WorkerStats, Tools::ListFailures, Tools::GetFailure],
+          # Explicit, or the SDK default advertises prompts/resources we do not
+          # register and `listChanged` flags this endpoint cannot deliver
+          # (they promise a `subscriptions/listen` stream we decline).
+          capabilities: {tools: {}, logging: {}},
           server_context: {adapter: Adapter.new, environment: environment}
         )
       end

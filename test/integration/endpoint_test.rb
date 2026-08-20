@@ -128,6 +128,45 @@ module Resque
           "explicit filter_parameters must replace, not merge with, the Rails list"
       end
 
+      def test_modern_lifecycle_tool_call_round_trips
+        skip "mcp < 1.2 has no SEP-2575 lifecycle" unless modern_lifecycle_supported?
+        reset_resque!
+        Resque.enqueue_to("imports", Class.new { def self.name = "ImportWorker" })
+
+        post_modern_jsonrpc(method: "tools/call", params: {name: "overview", arguments: {}})
+
+        assert_response :ok
+        result = response.parsed_body.fetch("result")
+        refute result["isError"]
+        assert result.fetch("structuredContent").key?("pending")
+      end
+
+      def test_modern_lifecycle_subscriptions_listen_is_refused_not_crashed
+        skip "mcp < 1.2 has no SEP-2575 lifecycle" unless modern_lifecycle_supported?
+        post_modern_jsonrpc(method: "subscriptions/listen", params: {notifications: {}})
+
+        assert_response :not_implemented
+        assert_equal 1, response.parsed_body.fetch("id"), "the client must be able to correlate the refusal"
+        error = response.parsed_body.fetch("error")
+        assert_equal(-32601, error.fetch("code"))
+        assert_includes error.fetch("message"), "subscriptions/listen"
+      end
+
+      def test_discover_advertises_only_capabilities_the_endpoint_serves
+        skip "mcp < 1.2 has no SEP-2575 lifecycle" unless modern_lifecycle_supported?
+        post_modern_jsonrpc(method: "server/discover")
+
+        assert_response :ok
+        capabilities = response.parsed_body.fetch("result").fetch("capabilities")
+        assert capabilities.key?("tools")
+        refute capabilities.key?("prompts")
+        refute capabilities.key?("resources")
+        capabilities.each_value do |flags|
+          refute flags.key?("listChanged"), "listChanged promises a stream this endpoint declines"
+          refute flags.key?("subscribe"), "subscribe promises a stream this endpoint declines"
+        end
+      end
+
       def test_non_post_verbs_are_method_not_allowed
         %i[get delete put patch options].each do |verb|
           public_send(verb, McpRequestHelpers::ENDPOINT)
