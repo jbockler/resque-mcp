@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0]
+
 - MCP SDK 1.x support: the `mcp` dependency widens to `>= 0.23, < 2`, admitting the SDK's API-stable 1.x line. No configuration changes; existing deployments behave as before.
 - Sessionless 2026-07-28 lifecycle (SEP-2575, needs `mcp >= 1.2`): clients may skip the `initialize` handshake and carry the protocol version per request, and discover the server via `server/discover`. Older `mcp` versions keep serving the handshake lifecycle unchanged.
 - Capabilities are now declared explicitly instead of taking the SDK's default, dropping the `listChanged`/`subscribe` notification flags a per-request stateless endpoint cannot push. Empty `prompts`/`resources` capabilities stay declared, so `prompts/list` and `resources/list` keep answering with empty lists.
