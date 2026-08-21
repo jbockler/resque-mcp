@@ -10,6 +10,10 @@ module Resque
           name: "resque-mcp",
           version: Resque::Mcp::VERSION,
           tools: [Tools::Overview, Tools::QueueStats, Tools::WorkerStats, Tools::ListFailures, Tools::GetFailure],
+          # Explicit, or the SDK advertises `listChanged`/`subscribe` streams
+          # we decline. This hash replaces the defaults and the SDK refuses
+          # methods whose key is absent — hence the empty prompts/resources.
+          capabilities: {tools: {}, prompts: {}, resources: {}, logging: {}},
           server_context: {adapter: Adapter.new, environment: environment}
         )
       end

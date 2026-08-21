@@ -22,6 +22,42 @@ module McpRequestHelpers
       headers: headers
   end
 
+  # The SEP-2575 sessionless lifecycle: no handshake, every request carries
+  # its own protocol version in `_meta` and mirrors it in the headers.
+  MODERN_PROTOCOL_VERSION = "2026-07-28"
+
+  MODERN_META = {
+    "io.modelcontextprotocol/protocolVersion" => MODERN_PROTOCOL_VERSION,
+    "io.modelcontextprotocol/clientCapabilities" => {}
+  }.freeze
+
+  # The lifecycle landed in mcp 1.2; the gemspec still admits 0.x, where
+  # these requests are answered with an unsupported-version error instead.
+  def modern_lifecycle_supported?
+    ::MCP::Configuration.const_defined?(:SUPPORTED_MODERN_PROTOCOL_VERSIONS)
+  end
+
+  def post_modern_jsonrpc(method:, params: {}, id: 1, authorization: default_authorization)
+    headers = {
+      "Content-Type" => "application/json",
+      "Accept" => "application/json, text/event-stream",
+      "MCP-Protocol-Version" => MODERN_PROTOCOL_VERSION,
+      "Mcp-Method" => method
+    }
+    # The SDK validates the header against `params[:uri]` for uri-bearing
+    # methods (`resources/read`), not just `params[:name]`.
+    body_name = params[:name] || params[:uri]
+    headers["Mcp-Name"] = body_name if body_name
+    headers["Authorization"] = authorization if authorization
+
+    post ENDPOINT,
+      params: {
+        jsonrpc: "2.0", id: id, method: method,
+        params: params.merge(_meta: MODERN_META)
+      }.to_json,
+      headers: headers
+  end
+
   def post_initialize(authorization: default_authorization)
     post_jsonrpc(method: "initialize", params: INITIALIZE_PARAMS, authorization: authorization)
   end

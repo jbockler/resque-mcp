@@ -6,6 +6,8 @@ module Resque
       before_action :require_auth_token, only: :handle
 
       def handle
+        # Rack 3 input may not be rewindable: read before the transport does.
+        @raw_jsonrpc_body = request.raw_post
         server = ServerFactory.build(environment: Rails.env.to_s)
         config = Resque::Mcp.config
         # Passthrough first; our security-critical keys override, so nothing
@@ -20,14 +22,7 @@ module Resque
         transport = ::MCP::Server::Transports::StreamableHTTPTransport.new(server, **options)
 
         status, headers, body = transport.handle_request(request)
-        headers.each { |key, value| response.set_header(key, value) }
-
-        payload = body.first
-        if payload
-          render json: payload, status: status
-        else
-          head status
-        end
+        render_transport_response(status, headers, body)
       end
 
       def method_not_allowed
@@ -35,6 +30,69 @@ module Resque
       end
 
       private
+
+      # Rack 3 forbids these on a response; the SSE headers carry one.
+      HOP_BY_HOP_HEADERS = %w[
+        connection keep-alive proxy-authenticate proxy-authorization
+        te trailer transfer-encoding upgrade
+      ].freeze
+
+      # A callable body is a stream the transport wants to keep open (today
+      # only `subscriptions/listen`); stateless has nothing to push, so decline.
+      def render_transport_response(status, headers, body)
+        if body.respond_to?(:call)
+          # 200, not 501: clients that reject on `!response.ok` never parse the
+          # body, and the transport headers describe the declined stream.
+          return render json: {
+            jsonrpc: "2.0",
+            id: jsonrpc_request_id,
+            error: {
+              code: -32601,
+              message: "Method not found: #{jsonrpc_method_label} is not supported by this stateless endpoint"
+            }
+          }, status: :ok
+        end
+
+        headers.each do |key, value|
+          next if HOP_BY_HOP_HEADERS.include?(key.to_s.downcase)
+          response.set_header(key, value)
+        end
+
+        payload = body.first
+        return head status unless payload
+
+        content_type = transport_content_type(headers)
+        if content_type && !content_type.start_with?("application/json")
+          render body: payload, content_type: content_type, status: status
+        else
+          render json: payload, status: status
+        end
+      end
+
+      # A null id leaves a strict client unable to correlate the error.
+      def jsonrpc_payload
+        @jsonrpc_payload ||= begin
+          parsed = JSON.parse(@raw_jsonrpc_body.to_s)
+          parsed.is_a?(Hash) ? parsed : {}
+        rescue JSON::ParserError
+          {}
+        end
+      end
+
+      def jsonrpc_request_id
+        id = jsonrpc_payload["id"]
+        id if id.is_a?(String) || id.is_a?(Integer)
+      end
+
+      def jsonrpc_method_label
+        method_name = jsonrpc_payload["method"]
+        method_name.is_a?(String) ? method_name : "this method"
+      end
+
+      def transport_content_type(headers)
+        _, value = headers.find { |key, _| key.to_s.casecmp("content-type").zero? }
+        value
+      end
 
       # No reliable boot-time hook exists (initializer ordering), so a
       # missing token is caught per request: 503, never silently open.
